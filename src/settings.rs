@@ -68,6 +68,7 @@ impl fmt::Debug for BitcoindClient {
             .field("ip_addr", &self.ip_addr)
             .field("user", &"****")
             .field("passwd", &"****")
+            .field("zmqurl", &self.zmq_url)
             .finish()
     }
 }

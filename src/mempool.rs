@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 
 use super::TxDepth;
 use crossbeam_skiplist::SkipMap;
+use dashmap::iter::Iter;
 use dashmap::DashMap;
 
 /// This is an special mempool that keeps track of the order of arrival for incoming transactions.
@@ -40,8 +41,12 @@ impl Mempool {
         };
     }
 
-    pub fn len(&self) -> usize {
-        self.txid_id_map.len()
+    pub fn len(&self) -> u32 {
+        self.txid_id_map.len() as u32
+    }
+
+    pub fn counter(&self) -> u64 {
+        self.counter.load(Ordering::SeqCst)
     }
 
     pub fn load_mempool_with(&self, vec2: Vec<Vec<TxDepth>>) {
@@ -49,5 +54,13 @@ impl Mempool {
             vec.into_iter()
                 .for_each(|tx_depth| self.add_tx(tx_depth.tx_id.to_string(), tx_depth.bytes))
         });
+    }
+
+    pub fn txid_pos_iterator(&self) -> Iter<String, u64> {
+        self.txid_id_map.iter()
+    }
+
+    pub fn pos_data_iterator(&self) -> crossbeam_skiplist::map::Iter<u64, Vec<u8>> {
+        self.id_tx_map.iter()
     }
 }

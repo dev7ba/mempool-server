@@ -1,7 +1,12 @@
 [package]
 name = "mempool-server"
+authors = ["dev7ba <dev7ba@protonmail.com>"]
+description = "Connect to a bitcoin node to serve its mempool via http GET"
 version = "0.1.0"
 edition = "2021"
+keywords = ["bitcoin", "mempool"]
+categories = ["command-line-utilities","cryptography::cryptocurrencies"]
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,10 +23,10 @@ crossbeam-skiplist = "0.1.1"
 
 url = { version = "2.3.1", features = ["serde"] }
 anyhow = "1.0"
-ctrlc = "3.2.5"
+# ctrlc = "3.2.5"
 rayon = "1.6.1"
 hex = "0.4.3"
 
 bitcoincore-rpc = "0.17.0"
-# bitcoincore-rpc = {path="../rust-bitcoincore-rpc/client"}
 bitcoincore-zmq= {path = "../bitcoincore-zmq", features=["check_node"] }
+rocket = "=0.5.0-rc.3"

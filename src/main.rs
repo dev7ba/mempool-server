@@ -6,12 +6,16 @@ use bitcoincore_zmq::{MempoolSequence, ZmqSeqListener};
 use log::{info, warn, LevelFilter};
 use mempool::Mempool;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rocket::response::stream::{ByteStream, TextStream};
+use rocket::State;
 use settings::{BitcoindClient, Settings};
 use simple_logger::SimpleLogger;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::thread;
+use std::thread::JoinHandle;
 use std::time::Duration;
 use txdepth::TxDepth;
 
@@ -19,7 +23,47 @@ mod mempool;
 mod settings;
 mod txdepth;
 
-fn main() -> Result<()> {
+#[macro_use]
+extern crate rocket;
+
+struct App {
+    pub mempool: Arc<Mempool>,
+    pub zmqseqlistener_stop: Arc<AtomicBool>,
+    pub zmqseqlistener_thread: JoinHandle<()>,
+    pub mp_filler_stop: Arc<AtomicBool>,
+    pub mp_filler_thread: JoinHandle<()>,
+}
+
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
+    match main_app() {
+        Ok(app) => {
+            info!("Mempool data loaded, launching REST Server...");
+            rocket::build()
+                .manage(app.mempool)
+                .mount("/mempool", routes![size, txsids, txsdata, txsdatadelimiter])
+                .launch()
+                .await?;
+
+            info!("ZMQ listener is stopping...");
+            app.zmqseqlistener_stop.store(true, Ordering::SeqCst);
+            app.zmqseqlistener_thread.join().unwrap();
+            info!("ZMQ listener stopped.");
+
+            info!("Mempool filler thread is stopping...");
+            app.mp_filler_stop.store(true, Ordering::SeqCst);
+            app.mp_filler_thread.join().unwrap();
+            info!("Mempool filler thread is stopped.");
+        }
+        Err(e) => {
+            error!("{}", e);
+        }
+    }
+
+    Ok(())
+}
+
+fn main_app() -> Result<App> {
     SimpleLogger::new()
         .with_module_level("bitcoincore_rpc", LevelFilter::Info)
         .with_utc_timestamps()
@@ -41,30 +85,37 @@ fn main() -> Result<()> {
 
     let stop_th = Arc::new(AtomicBool::new(false));
     let stop_th2 = stop_th.clone();
-    ctrlc::set_handler(move || stop_th2.store(true, Ordering::SeqCst))?;
     let zmqseqlistener = ZmqSeqListener::start(&bcc_settings.zmq_url)?;
-
     let bcc = get_client(&settings.bitcoind_client)?;
-    log_mempool_size(&bcc)?;
+    let size = log_mempool_size(&bcc)?;
 
-    let vec = get_tx_dept_vec(&bcc)?;
+    let vec = get_tx_dept_vec(&bcc, size)?;
     //vec2 is a vector of vectors containing txs with same ancestor_count:
     //(vec2[ancestor_count-1] has a vector with all tx having ancestor_count-1)
     let vec2 = get_mempool_layers(vec);
     log_mempool_layers(&vec2);
 
-    let mempool = Mempool::new();
+    let mempool = Arc::new(Mempool::new());
+    let mempool2 = mempool.clone();
     mempool.load_mempool_with(vec2);
     info!("Loaded mempool with {} transactions", mempool.len());
 
-    while !stop_th.load(Ordering::SeqCst) {
-        let mps = zmqseqlistener.receiver().recv()?;
-        info!("{:?}", &mps);
-        update_mempool(&mempool, &mps, &bcc)?;
-        info!("Mempool size: {}", mempool.len());
-        log_mempool_size(&bcc)?;
-    }
-    Ok(())
+    let thread = thread::spawn(move || {
+        while !stop_th2.load(Ordering::SeqCst) {
+            let mps = zmqseqlistener.rx.recv().unwrap();
+            info!("{:?}", &mps);
+            update_mempool(&mempool, &mps, &bcc).unwrap();
+            info!("Mempool size: {}", mempool.len());
+            log_mempool_size(&bcc).unwrap();
+        }
+    });
+    Ok(App {
+        mempool: mempool2,
+        zmqseqlistener_stop: zmqseqlistener.stop,
+        zmqseqlistener_thread: zmqseqlistener.thread,
+        mp_filler_stop: stop_th,
+        mp_filler_thread: thread,
+    })
 }
 
 fn check_and_wait_till_node_ok(bcc_settings: &BitcoindClient) -> Result<(), anyhow::Error> {
@@ -109,19 +160,26 @@ fn get_client_user_passw(ip: &str, user_name: String, passwd: String) -> Result<
         .with_context(|| format!("Can't connect to bitcoind node: {}", ip))
 }
 
-fn log_mempool_size(bcc: &Client) -> Result<(), anyhow::Error> {
+fn log_mempool_size(bcc: &Client) -> Result<usize, anyhow::Error> {
     let size = bcc
         .get_mempool_info()
         .with_context(|| "Can't connect to bitcoind node")?
         .size;
-    info!("# {} Transactions in bitcoin node mempool)", size);
-    Ok(())
+    info!("# {} Transactions in bitcoin node mempool", size);
+    Ok(size)
 }
 
-fn get_tx_dept_vec(source_client: &Client) -> Result<Vec<TxDepth>> {
+fn get_tx_dept_vec(source_client: &Client, size: usize) -> Result<Vec<TxDepth>> {
+    info!("Loading mempool txids and hierarchy...");
+    let i = AtomicU32::new(0);
+    let last_per = AtomicU32::new(0);
     let vec: Vec<TxDepth> = source_client
         .get_raw_mempool_verbose()?
         .par_iter()
+        .map(|(txid, mpe)| {
+            percent(&i, &last_per, size as u32);
+            (txid, mpe)
+        })
         .filter_map(|(tx_ide, mempool_entry)| {
             match source_client.get_raw_transaction_hex(tx_ide, None) {
                 Ok(raw) => Some(TxDepth {
@@ -134,6 +192,24 @@ fn get_tx_dept_vec(source_client: &Client) -> Result<Vec<TxDepth>> {
         })
         .collect();
     return Ok(vec);
+}
+
+//This funcion is incorrect, but the worst can happen (very unlikely) is a % been skipped.
+fn percent(ai: &AtomicU32, alast_per: &AtomicU32, size: u32) {
+    let i = ai.fetch_add(1, Ordering::SeqCst);
+    if i == 0 || size == 0 {
+        info!("Mempool txids and hierarchy loaded, now asking full txs binary data...");
+        info!("Loading: 0%");
+    } else {
+        if i == size {
+            info!("Done: 100%");
+        } else {
+            let per = ((i as f32 / size as f32) * 100f32).trunc() as u32;
+            if alast_per.fetch_max(per, Ordering::SeqCst) != per {
+                info!("Loading: {}%", per);
+            }
+        }
+    }
 }
 
 fn get_mempool_layers(vec: Vec<TxDepth>) -> Vec<Vec<TxDepth>> {
@@ -205,6 +281,49 @@ fn update_mempool(mempool: &Mempool, mps: &MempoolSequence, bcc: &Client) -> Res
                 }
             });
             Ok(())
+        }
+    }
+}
+
+#[get("/size")]
+fn size(mempool: &State<Arc<Mempool>>) -> String {
+    format!("{}", mempool.len())
+}
+
+#[get("/txsids")]
+fn txsids(mempool: &State<Arc<Mempool>>) -> TextStream![String + '_] {
+    TextStream! {
+        for entry in mempool.txid_pos_iterator(){
+            yield format!("{}\n",entry.key());
+        }
+    }
+}
+
+#[get("/txsdatadelimiter")]
+fn txsdatadelimiter(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
+    let mut first = true;
+    ByteStream! {
+    info!("Empieza stream");
+        for entry in mempool.pos_data_iterator(){
+            let data = entry.value().clone();
+            let size = data.len() as u32;
+            if first {
+                first=false;
+                yield mempool.len().to_be_bytes().to_vec();//u32 as a hint of its size
+                yield mempool.counter().to_be_bytes().to_vec();//u64 mempool counter
+            }
+            yield size.to_be_bytes().to_vec();
+            yield data;
+        }
+    info!("Fin del stream");
+    }
+}
+#[get("/txsdata")]
+fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
+    ByteStream! {
+        for entry in mempool.pos_data_iterator(){
+            let data = entry.value().clone();
+            yield data;
         }
     }
 }
