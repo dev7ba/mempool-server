@@ -35,14 +35,14 @@ First, you must have a `config.toml` file in the same directory as your executab
 ```
 [bitcoindclient]
   # Use cookie authentication
- 	cookieauthpath = "/home/myuser/.bitcoin/.cookie"
-	# If you use user/password authentication uncomment these lines
+  cookieauthpath = "/home/myuser/.bitcoin/.cookie"
+  # If you use user/password authentication uncomment these lines
   # user = "anon"
   # passwd = "anon"
 
-	# Bitcoin node ipaddr for rpc interface
+  # Bitcoin node ipaddr for rpc interface
   ipaddr = "192.168.1.39"
-	# Bitcoin node zmq interface defined in bitcoin.conf
+  # Bitcoin node zmq interface defined in bitcoin.conf
   zmqurl = "tcp://192.168.1.39:29000"
 ```
 Do not forget to add ``zmqpubrawtx=tcp://my_pub_ip:my_pub_port`` in source node `bitcoin.conf` file. 
