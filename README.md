@@ -10,7 +10,7 @@ When initializing, the server first starts a zmq listener to listen incoming txs
 
 When a client asks for the mempool, it will receive all the transactions stored at the moment ordered by dependency/depth (when loading) and arrival order (via zmq interface). This order guarantees that no txs are injected into a bitcoin node using bitcoin-client before any of its parents, thus, resulting in an error.
 
-This server thas two endpoints: `/mempool/txsdata` and `/mempool/txsdatafrom/{mempool_counter}`. First endpoint downloads the whole mempool up to the current moment of the query. To signal that moment, the last mempool counter is returned along with all mempool data. The second endpoint works the same, but it returns all mempool data from a mempool counter. Calling repeatedly second function until the mempool counter received is equal to the asked for, guarantees that server and client mempool are syncronized at that point (almost, due to tx collision between already-in-node transactions).
+This server thas two endpoints: `/mempool/txsdata` and `/mempool/txsdatafrom/{mempool_counter}`. First endpoint downloads the whole mempool up to the current moment of the query. To signal that moment, the last mempool counter is returned along with all mempool data. The second endpoint works the same, but it returns all mempool data from a mempool counter. Calling repeatedly to the second function until the mempool counter received is equal to the asked for guarantees that server and client mempool are syncronized at that point (almost, due to tx collision between already-in-node transactions).
 
 Binary schema for `/mempool/txsdata`:
 
@@ -21,6 +21,8 @@ Binary schema for `/mempool/txsdatafrom/{mempool_counter}`:
 |u64:MAX|mempool_counter:u64| [|txsize:u32|txdata:Vec<u8>|...]* N times
 
 Note that `/mempool/txsdatafrom/{mempool_counter}` cannot return a hint of the number of txs returned.
+
+Mempool-server uses asyncronous streams in http GETs to avoid using too much memory.
 
 Mempool-server connects to Bitcoin RPC using user and password (deprecated), or using cookie authentication.
 
