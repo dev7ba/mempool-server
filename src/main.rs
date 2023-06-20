@@ -41,7 +41,7 @@ async fn main() -> Result<(), rocket::Error> {
             info!("Mempool data loaded, launching REST Server...");
             rocket::build()
                 .manage(app.mempool)
-                .mount("/mempool", routes![size, txsids, txsdata, txsdatadelimiter])
+                .mount("/mempool", routes![size, txsids, txsdata, txsdatafrom])
                 .launch()
                 .await?;
 
@@ -105,7 +105,11 @@ fn main_app() -> Result<App> {
             let mps = zmqseqlistener.rx.recv().unwrap();
             info!("{:?}", &mps);
             update_mempool(&mempool, &mps, &bcc).unwrap();
-            info!("Mempool size: {}", mempool.len());
+            info!(
+                "Mempool size: {}, mempool counter: {}",
+                mempool.len(),
+                mempool.counter()
+            );
             log_mempool_size(&bcc).unwrap();
         }
     });
@@ -299,8 +303,8 @@ fn txsids(mempool: &State<Arc<Mempool>>) -> TextStream![String + '_] {
     }
 }
 
-#[get("/txsdatadelimiter")]
-fn txsdatadelimiter(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
+#[get("/txsdata")]
+fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
     let mut first = true;
     ByteStream! {
     info!("Empieza stream");
@@ -309,6 +313,7 @@ fn txsdatadelimiter(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] 
             let size = data.len() as u32;
             if first {
                 first=false;
+                yield u64::MAX.to_be_bytes().to_vec();//Magic number to start a correct stream
                 yield mempool.len().to_be_bytes().to_vec();//u32 as a hint of its size
                 yield mempool.counter().to_be_bytes().to_vec();//u64 mempool counter
             }
@@ -318,12 +323,25 @@ fn txsdatadelimiter(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] 
     info!("Fin del stream");
     }
 }
-#[get("/txsdata")]
-fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
+
+#[get("/txsdatafrom/<from>")]
+fn txsdatafrom(from: u64, mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
+    let mut first = true;
     ByteStream! {
-        for entry in mempool.pos_data_iterator(){
+    info!("Empieza stream");
+    let range = mempool.pos_data_iterator_from(from);
+        for entry in range{
             let data = entry.value().clone();
+            let size = data.len() as u32;
+            if first {
+                first=false;
+                yield u64::MAX.to_be_bytes().to_vec();//Magic number to start a correct stream
+                //No hint of its size since calculate it consumes the iterator
+                yield mempool.counter().to_be_bytes().to_vec();//u64 mempool counter
+            }
+            yield size.to_be_bytes().to_vec();
             yield data;
         }
+    info!("Fin del stream");
     }
 }

@@ -1,3 +1,4 @@
+use std::ops::RangeFrom;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
@@ -62,5 +63,12 @@ impl Mempool {
 
     pub fn pos_data_iterator(&self) -> crossbeam_skiplist::map::Iter<u64, Vec<u8>> {
         self.id_tx_map.iter()
+    }
+
+    pub fn pos_data_iterator_from(
+        &self,
+        from: u64,
+    ) -> crossbeam_skiplist::map::Range<'_, u64, RangeFrom<u64>, u64, Vec<u8>> {
+        self.id_tx_map.range(from..)
     }
 }
