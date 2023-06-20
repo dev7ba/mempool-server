@@ -41,9 +41,9 @@ First, you must have a `config.toml` file in the same directory as your executab
   # passwd = "anon"
 
   # Bitcoin node ipaddr for rpc interface
-  ipaddr = "192.168.1.39"
+  ipaddr = "my_node_rpc_ip_address"
   # Bitcoin node zmq interface defined in bitcoin.conf
-  zmqurl = "tcp://192.168.1.39:29000"
+  zmqurl = "tcp://my_node_zmq_ip_address:port"
 ```
 Do not forget to add ``zmqpubrawtx=tcp://my_pub_ip:my_pub_port`` in source node `bitcoin.conf` file. 
 
