@@ -56,7 +56,7 @@ Compilling instructions
 
 - Install [rust](https://rustup.rs/) in your system
 - Clone the repository in a directory: `git clone https://github.com/dev7ba/mempool-server.git`
-- Clone bitcoincore_rpc library repository the same directory as before: `git clone https://github.com/dev7ba/bitcoincore_zmq.git`
+- Clone [bitcoincore_rpc](https://github.com/dev7ba/bitcoincore-zmq) library repository the same directory as before: `git clone https://github.com/dev7ba/bitcoincore_zmq.git`
 - Go into mempool-server directory and execute `cargo build` or `cargo build --release`. The executable will appear in `/mempool-server/target/debug` or in `/mempool-server/target/release`
 - Enjoy
 ```
