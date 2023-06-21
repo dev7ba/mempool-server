@@ -3,6 +3,8 @@ Mempool-server
 
 Mempool-server is a service which keeps track of a Bitcoin node mempool and serves its contents via http GET. Then bitcoin-client can ask for that mempool and inject it in another Bitcoin node.
 
+The main purpose of mempool-server/client is to be able to fill a just-started Bitcoin node with transactions from another mempool, avoiding the time necessary for a node to 'sync with the mempool'. Be aware that there is not such a thing as a global Mempool, so differences between nodes are expected.
+
 How does it works?
 ------------------
 
@@ -35,7 +37,7 @@ First, you must have a `config.toml` file in the same directory as your executab
 ```
 [bitcoindclient]
   # Use cookie authentication
-  cookieauthpath = "/home/myuser/.bitcoin/.cookie"
+  cookieauthpath = "/home/my_linux_user/.bitcoin/.cookie"
   # If you use user/password authentication uncomment these lines
   # user = "anon"
   # passwd = "anon"
@@ -52,6 +54,7 @@ Compilling instructions
 
 - Install [rust](https://rustup.rs/) in your system
 - Clone the repository in a directory: `git clone https://github.com/dev7ba/mempool-server.git`
-- Go into directory and execute `cargo build` or `cargo build --release`. The executable will appear in `/mempool-server/target/debug` or in `/mempool-server/target/release`
+- Clone bitcoincore_rpc library repository the same directory as before: `git clone https://github.com/dev7ba/bitcoincore_zmq.git`
+- Go into mempool-server directory and execute `cargo build` or `cargo build --release`. The executable will appear in `/mempool-server/target/debug` or in `/mempool-server/target/release`
 - Enjoy
 ```
