@@ -3,7 +3,7 @@ use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{bitcoin::hashes::sha256d::Hash, bitcoin::Txid, Auth, Client, RpcApi};
 use bitcoincore_zmq::check::{ClientConfig, NodeChecker};
 use bitcoincore_zmq::{MempoolSequence, ZmqSeqListener};
-use log::{info, warn, LevelFilter};
+use log::{info, log, warn, Level, LevelFilter};
 use mempool::Mempool;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocket::response::stream::{ByteStream, TextStream};
@@ -65,7 +65,10 @@ async fn main() -> Result<(), rocket::Error> {
 
 fn main_app() -> Result<App> {
     SimpleLogger::new()
+        .with_level(LevelFilter::Info)
         .with_module_level("bitcoincore_rpc", LevelFilter::Info)
+        .with_module_level("mempool_server", LevelFilter::Info)
+        .env()
         .with_utc_timestamps()
         .with_colors(true)
         .init()
@@ -87,7 +90,7 @@ fn main_app() -> Result<App> {
     let stop_th2 = stop_th.clone();
     let zmqseqlistener = ZmqSeqListener::start(&bcc_settings.zmq_url)?;
     let bcc = get_client(&settings.bitcoind_client)?;
-    let size = log_mempool_size(&bcc)?;
+    let size = log_mempool_size(&bcc, Level::Info)?;
 
     let vec = get_tx_dept_vec(&bcc, size)?;
     //vec2 is a vector of vectors containing txs with same ancestor_count:
@@ -103,14 +106,14 @@ fn main_app() -> Result<App> {
     let thread = thread::spawn(move || {
         while !stop_th2.load(Ordering::SeqCst) {
             let mps = zmqseqlistener.rx.recv().unwrap();
-            info!("{:?}", &mps);
+            debug!("{:?}", &mps);
             update_mempool(&mempool, &mps, &bcc).unwrap();
-            info!(
+            debug!(
                 "Mempool size: {}, mempool counter: {}",
                 mempool.len(),
                 mempool.counter()
             );
-            log_mempool_size(&bcc).unwrap();
+            log_mempool_size(&bcc, Level::Debug).unwrap();
         }
     });
     Ok(App {
@@ -164,12 +167,12 @@ fn get_client_user_passw(ip: &str, user_name: String, passwd: String) -> Result<
         .with_context(|| format!("Can't connect to bitcoind node: {}", ip))
 }
 
-fn log_mempool_size(bcc: &Client) -> Result<usize, anyhow::Error> {
+fn log_mempool_size(bcc: &Client, level: Level) -> Result<usize, anyhow::Error> {
     let size = bcc
         .get_mempool_info()
         .with_context(|| "Can't connect to bitcoind node")?
         .size;
-    info!("# {} Transactions in bitcoin node mempool", size);
+    log!(level, "#{} Transactions in bitcoin node mempool", size);
     Ok(size)
 }
 
@@ -307,7 +310,7 @@ fn txsids(mempool: &State<Arc<Mempool>>) -> TextStream![String + '_] {
 fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
     let mut first = true;
     ByteStream! {
-    info!("Empieza stream");
+        info!("Started stream.");
         for entry in mempool.pos_data_iterator(){
             let data = entry.value().clone();
             let size = data.len() as u32;
@@ -320,7 +323,7 @@ fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
             yield size.to_be_bytes().to_vec();
             yield data;
         }
-    info!("Fin del stream");
+        info!("Finished stream.");
     }
 }
 
@@ -328,7 +331,6 @@ fn txsdata(mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
 fn txsdatafrom(from: u64, mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> + '_] {
     let mut first = true;
     ByteStream! {
-    info!("Empieza stream");
     let range = mempool.pos_data_iterator_from(from);
         for entry in range{
             let data = entry.value().clone();
@@ -342,6 +344,5 @@ fn txsdatafrom(from: u64, mempool: &State<Arc<Mempool>>) -> ByteStream![Vec<u8> 
             yield size.to_be_bytes().to_vec();
             yield data;
         }
-    info!("Fin del stream");
     }
 }

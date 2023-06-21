@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 
 log = "0.4.17"
-simple_logger = "4.1.0"
+simple_logger = "4.2.0"
 
 serde = { version = "1", features = [ "derive" ] }
 config = "0.13.3"
