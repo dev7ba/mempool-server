@@ -5,7 +5,7 @@ Mempool-server is a service which keeps track of a Bitcoin node mempool and serv
 
 The main purpose of mempool-server/client is to be able to fill a just-started Bitcoin node with transactions from another mempool, avoiding the time necessary for a node to 'sync with the mempool'. Be aware that there is not such a thing as a global Mempool, so differences between nodes are expected.
 
-[diagram](./resources/diagram.png)
+![diagram](./resources/diagram.png)
 
 How does it works?
 ------------------
