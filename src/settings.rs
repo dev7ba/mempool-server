@@ -2,7 +2,6 @@ use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::fmt;
 use std::{env, path::PathBuf};
-use url::Url;
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -14,8 +13,8 @@ pub struct BitcoindClient {
     pub ip_addr: String,
     pub user: Option<String>,
     pub passwd: Option<String>,
-    #[serde(rename = "zmqurl")]
-    pub zmq_url: Url,
+    #[serde(rename = "zmqport")]
+    pub zmq_port: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +33,7 @@ pub struct Settings {
 ///   ipaddr = "localhost"
 ///   user = "anon"
 ///   passwd = "anon"
+///   zmqport= 29000
 /// ```
 /// If you are using environment variables, you must use MPS as prefix. All section/variables
 /// cannot have '_' in its name since '_' is used as delimiter, therefore:
@@ -42,7 +42,9 @@ pub struct Settings {
 /// export MPS_BITCOINDCLIENT_IPADDR=localhost
 /// export MPS_BITCOINDCLIENT_USER=my_user
 /// export MPS_BITCOINDCLIENT_PASSWD=my_passwd
+/// export MPS_BITCOINDCLIENT_ZMQPORT=my_passwd
 /// ```
+/// Note: use always export (not set or "varible=value")
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut path = env::current_exe().unwrap();
@@ -51,7 +53,8 @@ impl Settings {
         let s = Config::builder()
             .add_source(File::with_name(path.to_str().unwrap()).required(false))
             .add_source(
-                Environment::with_prefix("mps")
+                Environment::with_prefix("MPS")
+                    .try_parsing(true)
                     .prefix_separator("_")
                     .separator("_"),
             )
@@ -68,7 +71,7 @@ impl fmt::Debug for BitcoindClient {
             .field("ip_addr", &self.ip_addr)
             .field("user", &"****")
             .field("passwd", &"****")
-            .field("zmqurl", &self.zmq_url.to_string())
+            .field("zmqport", &self.zmq_port.to_string())
             .finish()
     }
 }

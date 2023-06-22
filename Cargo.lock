@@ -150,8 +150,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoincore-zmq"
+name = "bitcoincore-zmqsequence"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80a6e4c5dace1e354f488e71e12fdf98b35833578dadbd9b5c9371946bab41e0"
 dependencies = [
  "bitcoincore-rpc",
  "hex",
@@ -924,7 +926,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitcoincore-rpc",
- "bitcoincore-zmq",
+ "bitcoincore-zmqsequence",
  "config",
  "crossbeam-skiplist",
  "dashmap",

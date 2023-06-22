@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{bitcoin::hashes::sha256d::Hash, bitcoin::Txid, Auth, Client, RpcApi};
-use bitcoincore_zmq::check::{ClientConfig, NodeChecker};
-use bitcoincore_zmq::{MempoolSequence, ZmqSeqListener};
+use bitcoincore_zmqsequence::check::{ClientConfig, NodeChecker};
+use bitcoincore_zmqsequence::{MempoolSequence, ZmqSeqListener};
 use log::{info, log, warn, Level, LevelFilter};
 use mempool::Mempool;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -18,6 +18,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use txdepth::TxDepth;
+use url::Url;
 
 mod mempool;
 mod settings;
@@ -88,7 +89,11 @@ fn main_app() -> Result<App> {
 
     let stop_th = Arc::new(AtomicBool::new(false));
     let stop_th2 = stop_th.clone();
-    let zmqseqlistener = ZmqSeqListener::start(&bcc_settings.zmq_url)?;
+    let zmq_url = Url::parse(&format!(
+        "tcp://{}:{}",
+        &bcc_settings.ip_addr, &bcc_settings.zmq_port
+    ))?;
+    let zmqseqlistener = ZmqSeqListener::start(&zmq_url)?;
     let bcc = get_client(&settings.bitcoind_client)?;
     let size = log_mempool_size(&bcc, Level::Info)?;
 
