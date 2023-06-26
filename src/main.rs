@@ -42,7 +42,10 @@ async fn main() -> Result<(), rocket::Error> {
             info!("Mempool data loaded, launching REST Server...");
             rocket::build()
                 .manage(app.mempool)
-                .mount("/mempool", routes![size, txsids, txsdata, txsdatafrom])
+                .mount(
+                    "/mempoolServer",
+                    routes![size, txsids, txsdata, txsdatafrom],
+                )
                 .launch()
                 .await?;
 

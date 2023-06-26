@@ -2,7 +2,7 @@
 name = "mempool-server"
 authors = ["dev7ba <dev7ba@protonmail.com>"]
 description = "Connect to a bitcoin node to serve its mempool via http GET"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 keywords = ["bitcoin", "mempool"]
 categories = ["command-line-utilities","cryptography::cryptocurrencies"]
@@ -23,7 +23,6 @@ crossbeam-skiplist = "0.1.1"
 
 url = { version = "2.3.1", features = ["serde"] }
 anyhow = "1.0"
-# ctrlc = "3.2.5"
 rayon = "1.6.1"
 hex = "0.4.3"
 
