@@ -22,14 +22,16 @@ dashmap = "5.4.0"
 crossbeam-skiplist = "0.1.1"
 
 url = { version = "2.3.1", features = ["serde"] }
+dirs = "5.0.1"
 anyhow = "1.0"
 rayon = "1.6.1"
 hex = "0.4.3"
 
 bitcoincore-rpc = "0.17.0"
-# bitcoincore-zmqsequence= {path = "../bitcoincore-zmqsequence", features=["check_node"] }
-bitcoincore-zmqsequence= {version = "0.1", features=["check_node"] }
+bitcoincore-zmqsequence= {path = "../bitcoincore-zmqsequence", features=["check_node"] }
+# bitcoincore-zmqsequence= {version = "0.2", features=["check_node"] }
 rocket = "=0.5.0-rc.3"
+nix = "0.26.2"
 
 [profile.release]
 strip=true # Strip symbols in binary.

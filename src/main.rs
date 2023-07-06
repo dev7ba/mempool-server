@@ -3,16 +3,20 @@ use bitcoincore_rpc::bitcoin::BlockHash;
 use bitcoincore_rpc::{bitcoin::hashes::sha256d::Hash, bitcoin::Txid, Auth, Client, RpcApi};
 use bitcoincore_zmqsequence::check::{ClientConfig, NodeChecker};
 use bitcoincore_zmqsequence::{MempoolSequence, ZmqSeqListener};
-use log::{info, log, warn, Level, LevelFilter};
+use log::{error, info, log, warn, Level, LevelFilter};
 use mempool::Mempool;
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::getpid;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocket::response::stream::{ByteStream, TextStream};
+// use rocket::tokio::runtime::Handle;
 use rocket::State;
 use settings::{BitcoindClient, Settings};
 use simple_logger::SimpleLogger;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
@@ -90,8 +94,6 @@ fn main_app() -> Result<App> {
     let bcc_settings = &settings.bitcoind_client;
     check_and_wait_till_node_ok(bcc_settings)?;
 
-    let stop_th = Arc::new(AtomicBool::new(false));
-    let stop_th2 = stop_th.clone();
     let zmq_url = Url::parse(&format!(
         "tcp://{}:{}",
         &bcc_settings.ip_addr, &bcc_settings.zmq_port
@@ -107,30 +109,78 @@ fn main_app() -> Result<App> {
     log_mempool_layers(&vec2);
 
     let mempool = Arc::new(Mempool::new());
-    let mempool2 = mempool.clone();
     mempool.load_mempool_with(vec2);
     info!("Loaded mempool with {} transactions", mempool.len());
 
-    let thread = thread::spawn(move || {
-        while !stop_th2.load(Ordering::SeqCst) {
-            let mps = zmqseqlistener.rx.recv().unwrap();
-            debug!("{:?}", &mps);
-            update_mempool(&mempool, &mps, &bcc).unwrap();
-            debug!(
-                "Mempool size: {}, mempool counter: {}",
-                mempool.len(),
-                mempool.counter()
-            );
-            log_mempool_size(&bcc, Level::Debug).unwrap();
-        }
-    });
+    let mp_filler_stop_th = Arc::new(AtomicBool::new(false));
+    let mp_filler_thread = launch_mp_filler_thread(
+        mp_filler_stop_th.clone(),
+        zmqseqlistener.rx,
+        mempool.clone(),
+        bcc,
+        settings.bitcoind_client.wait_timeout_sec.unwrap(),
+    );
+
     Ok(App {
-        mempool: mempool2,
+        mempool: mempool,
         zmqseqlistener_stop: zmqseqlistener.stop,
         zmqseqlistener_thread: zmqseqlistener.thread,
-        mp_filler_stop: stop_th,
-        mp_filler_thread: thread,
+        mp_filler_stop: mp_filler_stop_th,
+        mp_filler_thread,
     })
+}
+
+fn launch_mp_filler_thread(
+    stop_th2: Arc<AtomicBool>,
+    rx: Receiver<MempoolSequence>,
+    mempool: Arc<Mempool>,
+    bcc: Client,
+    timeout_sec: u64,
+) -> JoinHandle<()> {
+    let thread = thread::Builder::new()
+        .name(String::from("mp_filler"))
+        .spawn(move || {
+            let mut stopping = false;
+            while !stop_th2.load(Ordering::SeqCst) {
+                match rx.recv_timeout(Duration::from_secs(timeout_sec)) {
+                    Ok(mps) => {
+                        debug!("{:?}", &mps);
+                        update_mempool(&mempool, &mps, &bcc).unwrap();
+                        debug!(
+                            "Mempool size: {}, mempool counter: {}",
+                            mempool.len(),
+                            mempool.counter()
+                        );
+                        log_mempool_size(&bcc, Level::Debug).unwrap();
+                    }
+                    Err(err) => match err {
+                        RecvTimeoutError::Timeout => {
+                            error!(
+                                "No zmq message in more than {} seconds, stopping...: {}",
+                                timeout_sec, err
+                            );
+                            stopping = true;
+                            stop_th2.store(true, Ordering::SeqCst);
+                            if let Err(err) = kill(getpid(), Signal::SIGINT) {
+                                error!("Failed to send SIGINT signal: {}", err);
+                            }
+                            // let runtime = Handle::current();
+                            // runtime.block_on(async {
+                            //     rocket::tokio::signal::ctrl_c().await.unwrap();
+                            // });
+                            //
+                        }
+                        _ => {
+                            if !stopping {
+                                error!("recv_timeout error: {}", err);
+                            }
+                        }
+                    },
+                }
+            }
+        })
+        .unwrap();
+    thread
 }
 
 fn check_and_wait_till_node_ok(bcc_settings: &BitcoindClient) -> Result<(), anyhow::Error> {

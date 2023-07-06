@@ -35,7 +35,7 @@ Mempool-server is compatible with any limitancestorcount value in bitcoin.conf
 Usage
 -----
 
-First, you must have a `config.toml` file in the same directory as your executable with contents like the following:
+If not using the defaults shown at execution, you must have a `config.toml` file in the same directory as your executable with contents like the following:
 ```
 [bitcoindclient]
   # Use cookie authentication
@@ -48,6 +48,10 @@ First, you must have a `config.toml` file in the same directory as your executab
   ipaddr = "my_node_rpc_ip_address"
   # Bitcoin node zmq interface defined in bitcoin.conf
   zmqurl = "tcp://my_node_zmq_ip_address:port"
+  # Time waiting for any txs from bitcoind, ends server if timeout.
+  # Use restart: always in a docker container to have tolerance to failure.
+  # Defaults to 60 seconds
+  waittimeoutsec = 60 
 ```
 Do not forget to add ``zmqpubrawtx=tcp://my_pub_ip:my_pub_port`` in source node `bitcoin.conf` file. 
 
