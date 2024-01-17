@@ -1,6 +1,8 @@
 Mempool-server
 ==============
 
+NOTE: This project may be deprecated by bitcoind RPC commands `savemempool` and `importmempool`.
+
 Mempool-server is a service which keeps track of a Bitcoin node mempool and serves its contents via http GET. Then [bitcoin-client](https://github.com/dev7ba/mempool-client) can ask for that mempool and inject it in another Bitcoin node.
 
 The main purpose of mempool-server/client is to be able to fill a just-started Bitcoin node with transactions from another mempool, avoiding the time necessary for a node to 'sync with the mempool'. Be aware that there is not such a thing as a global Mempool, so differences between nodes are expected.

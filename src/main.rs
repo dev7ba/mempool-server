@@ -5,11 +5,11 @@ use bitcoincore_zmqsequence::check::{ClientConfig, NodeChecker};
 use bitcoincore_zmqsequence::{MempoolSequence, ZmqSeqListener};
 use log::{error, info, log, warn, Level, LevelFilter};
 use mempool::Mempool;
-use nix::sys::signal::{kill, Signal};
-use nix::unistd::getpid;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rocket::response::stream::{ByteStream, TextStream};
-// use rocket::tokio::runtime::Handle;
+
+use nix::sys::signal::{kill, Signal};
+use nix::unistd::getpid;
 use rocket::State;
 use settings::{BitcoindClient, Settings};
 use simple_logger::SimpleLogger;
@@ -122,7 +122,7 @@ fn main_app() -> Result<App> {
     );
 
     Ok(App {
-        mempool: mempool,
+        mempool,
         zmqseqlistener_stop: zmqseqlistener.stop,
         zmqseqlistener_thread: zmqseqlistener.thread,
         mp_filler_stop: mp_filler_stop_th,

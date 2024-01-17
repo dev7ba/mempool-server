@@ -12,26 +12,26 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 
-log = "0.4.17"
-simple_logger = "4.2.0"
+log = "0.4.20"
+simple_logger = "4.3.0"
 
 serde = { version = "1", features = [ "derive" ] }
-config = "0.13.3"
+config = "0.13.4"
 
-dashmap = "5.4.0"
+dashmap = "5.5.3"
 crossbeam-skiplist = "0.1.1"
 
-url = { version = "2.3.1", features = ["serde"] }
+url = { version = "2.5.0", features = ["serde"] }
 dirs = "5.0.1"
 anyhow = "1.0"
-rayon = "1.6.1"
+rayon = "1.8.0"
 hex = "0.4.3"
 
-bitcoincore-rpc = "0.17.0"
+bitcoincore-rpc = "0.18.0"
 bitcoincore-zmqsequence= {path = "../bitcoincore-zmqsequence", features=["check_node"] }
 # bitcoincore-zmqsequence= {version = "0.2", features=["check_node"] }
-rocket = "=0.5.0-rc.3"
-nix = "0.26.2"
+rocket = "=0.5.0"
+nix = {version = "0.27.1",features=["signal"]}
 
 [profile.release]
 strip=true # Strip symbols in binary.
